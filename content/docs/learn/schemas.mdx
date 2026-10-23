@@ -1,0 +1,78 @@
+---
+title: Schemas
+description: Events, which side sends them, reliable or unreliable, and splitting a schema across files.
+---
+
+A schema lists every message your game sends. Courier only sends messages that are in the schema, and that's how it knows exactly how many bits each one needs.
+
+## Events
+
+An event is a message sent from one side to the other:
+
+```courier
+event Coins from Server { Amount: u32 }
+```
+
+| Part | What it means |
+| --- | --- |
+| `Coins` | The name your scripts use: `Net.Coins`. |
+| `from Server` | Who sends it. With `from Server`, the server fires it and clients listen. `from Client` is the other way round. |
+| `{ Amount: u32 }` | What it carries. Each field is a name and a [type](/docs/learn/types), separated by commas. |
+
+Your handler gets the fields in the order you wrote them. A field's name is also its parameter name in `Fire` and `On`, so your editor shows it.
+
+An event can carry nothing at all, like `event Click from Client {}`.
+
+## Reliable or unreliable
+
+Events are reliable unless you say otherwise. A reliable message always arrives, and messages arrive in the order you sent them.
+
+An unreliable message can be lost, or arrive out of order with other unreliable messages. The upside is that a lost message doesn't hold up the ones after it while Roblox sends it again:
+
+```courier
+event Hit from Server unreliable {
+	Damage: int(0..100),
+	Health: int(0..100),
+}
+```
+
+Use unreliable for messages you send often, where each new one replaces the last: a health bar, a position, a hit marker. Use reliable for anything that has to arrive: a purchase, a round starting, a chat message.
+
+Unreliable events can't carry Instances, and Courier sends at most 900 bytes of unreliable messages in one remote call. See [Limits](/docs/limits).
+
+## Comments
+
+`--` starts a comment that runs to the end of the line, like in Luau:
+
+```courier
+-- the server tells a client how much a hit did
+event Hit from Server unreliable {
+	Damage: int(0..100), -- how much health the hit took
+	Health: int(0..100), -- how much health is left
+}
+```
+
+## Splitting a schema into files
+
+Every `.courier` file in a folder is part of the same schema, so you can split it however you like:
+
+```text
+src/Net/
+  Combat.courier
+  Shop.courier
+  Types.courier
+```
+
+A type declared in one file can be used in every other file in the folder, even before it's declared. The folder still compiles to one module, `Net`, and all its messages to a player go out together.
+
+Each event gets an id from its position: files in name order, then events in the order they're written. The id uses as few bits as the number of events allows. With 3 events from the server, each message from the server spends 2 bits on its id.
+
+A second folder is a second schema, with its own module, its own runtime and its own remotes. Most games only need one.
+
+## Changing a schema
+
+You can change a schema whenever you like. A server and its clients always run the same version of your place, so they always have the same schema.
+
+If you rename an event or a field, it's renamed in the generated code too, and your editor shows an error in every script that still uses the old name.
+
+Next: [Types](/docs/learn/types)

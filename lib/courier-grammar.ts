@@ -1,0 +1,92 @@
+import type { LanguageRegistration } from "shiki";
+
+// the grammar the editor extension ships (editors/vscode/syntaxes in the Courier repo), so schemas
+// on the site are coloured the way they are in the editor
+export const courierGrammar = {
+  name: "courier",
+  scopeName: "source.courier",
+  patterns: [
+    {
+      include: "#comment",
+    },
+    {
+      include: "#declaration",
+    },
+    {
+      include: "#field",
+    },
+    {
+      include: "#type",
+    },
+    {
+      include: "#side",
+    },
+    {
+      include: "#keyword",
+    },
+    {
+      include: "#number",
+    },
+    {
+      include: "#text",
+    },
+    {
+      include: "#operator",
+    },
+  ],
+  repository: {
+    comment: {
+      name: "comment.line.double-dash.courier",
+      match: "--.*$",
+    },
+    declaration: {
+      match:
+        "\\b(enum|struct|union|event|function)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      captures: {
+        "1": {
+          name: "keyword.declaration.courier",
+        },
+        "2": {
+          name: "entity.name.type.courier",
+        },
+      },
+    },
+    field: {
+      match: "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=:)",
+      name: "variable.other.member.courier",
+    },
+    type: {
+      patterns: [
+        {
+          name: "support.type.primitive.courier",
+          match:
+            "\\b(bool|[ui][0-9]+|int|float|f32|f64|vector|rotation|cframe|string|buffer|map)\\b",
+        },
+        {
+          name: "support.class.courier",
+          match: "\\b(Instance|Handle)\\b",
+        },
+      ],
+    },
+    side: {
+      name: "constant.language.side.courier",
+      match: "\\b(Server|Client)\\b",
+    },
+    keyword: {
+      name: "keyword.other.courier",
+      match: "\\b(from|unreliable)\\b",
+    },
+    number: {
+      name: "constant.numeric.courier",
+      match: "-?\\b[0-9]+(\\.[0-9]+)?\\b",
+    },
+    text: {
+      name: "string.quoted.double.courier",
+      match: '"[^"\\n]*"',
+    },
+    operator: {
+      name: "keyword.operator.courier",
+      match: "\\.\\.|->|\\?|=",
+    },
+  },
+} as unknown as LanguageRegistration;

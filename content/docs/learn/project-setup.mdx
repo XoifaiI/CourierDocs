@@ -1,0 +1,87 @@
+---
+title: Project setup
+description: Where to put schemas, what the compiler writes, and the runtime's settings.
+---
+
+## Compiling schemas
+
+Run `courier` or `courier watch` in your project folder. Every folder inside it that has a `.courier` file is a schema, and is compiled into that same folder. Hidden folders, `node_modules`, `Packages` and `target` are skipped.
+
+| Command | What it does |
+| --- | --- |
+| `courier` | Compiles every schema once. |
+| `courier watch` | Compiles every schema, then again whenever a schema is changed, added or deleted. It also finds new schema folders by itself. |
+
+A file is only written when its contents changed, so Rojo only syncs files that actually changed.
+
+The compiler never overwrites an `init.luau` it didn't write. If your folder already has one, it stops and tells you. Keep each schema in a folder of its own.
+
+## Generated files
+
+| File | What it is |
+| --- | --- |
+| `init.luau` | The module your scripts require, with its types. |
+| `Implementation.luau` | The generated code. Don't edit it, since it's rewritten every time you compile. |
+| `Courier/` | The runtime this schema uses. |
+
+You can commit these files or ignore them. The compiler always writes the same files from the same schema, so if you ignore them, run `courier` before `rojo build`.
+
+Courier only writes files, so you need something like [Rojo](https://rojo.space) to sync them into Studio.
+
+## Requiring the module
+
+Require the folder like any other module. The first time the server requires it, it makes the remotes, and clients wait until they exist. So make sure a server script requires it, even if the server only listens.
+
+## Settings
+
+The runtime's settings are in `Courier.Config`, in the runtime the compiler wrote into your folder:
+
+```luau
+local Courier = require(ReplicatedStorage.Net.Courier)
+Courier.Config.InvokeTimeout = 10
+```
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `ReliableCapacity` | 1 MiB | How many bytes of reliable messages a player can be sent in one frame before Courier sends them early, in more than one call. The server keeps this much memory per player. |
+| `UnreliableCapacity` | 900 bytes | The same for unreliable messages. Roblox drops unreliable calls bigger than 1,000 bytes, so keep it below that. |
+| `InvokeTimeout` | 30 seconds | How long a [function call](/docs/learn/functions) waits for an answer. |
+| `MaxFrameBytes` | 64 KB | The most the server reads from one client in one frame. Anything bigger is ignored, and the first time it happens Courier warns. |
+| `OnFrame` | `nil` | A function the server calls with `(Player, Success)` for every frame a client sends. See [Trusting clients](/docs/learn/trusting-clients#kicking-clients-that-send-bad-messages). |
+
+`ReliableCapacity` and `UnreliableCapacity` are read the first time `Net` is required, so set them before that. Roblox doesn't run your scripts in a fixed order, so the safe way is to make one module that sets them and returns `Net`, and require that module everywhere instead:
+
+```luau
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Courier = require(ReplicatedStorage.Net.Courier)
+Courier.Config.ReliableCapacity = 4 * 1024 * 1024
+
+return require(ReplicatedStorage.Net)
+```
+
+The other settings are read every time they're used, so you can change them whenever you like.
+
+## More than one schema
+
+Each folder is its own schema, with its own module, its own runtime and its own remotes. Messages from two schemas are sent in separate calls. Most games only need one schema, split across [as many files](/docs/learn/schemas#splitting-a-schema-into-files) as you like.
+
+## Using one runtime from Wally
+
+By default, each schema gets its own copy of the runtime, which always matches the compiler that wrote it. If you'd rather use one runtime from your packages, install it with Wally:
+
+```toml title="wally.toml"
+[dependencies]
+Courier = "xoifaii/courier@0.2.0"
+```
+
+Then tell the compiler where it is:
+
+```sh
+courier --runtime ReplicatedStorage.Packages.Courier src/Net
+```
+
+The schema then requires the runtime from that path, and nothing is written to `src/Net/Courier`. One runtime can only be used by one schema.
+
+Next: [Editor](/docs/learn/editor)

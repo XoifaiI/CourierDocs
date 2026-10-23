@@ -1,0 +1,50 @@
+---
+title: Limits
+description: The numbers that change what you write.
+---
+
+Check a number before you hit it.
+
+Only numbers that change what you do are here. A schema that breaks one doesn't compile, and the compiler says why. A message that breaks one at run time makes `Fire` error, naming the event and the field.
+
+## Schemas
+
+| | Limit |
+| --- | --- |
+| `uN` and `iN` | `N` from 1 to 32. |
+| One number | At most 32 bits. An `int` range or a `float`'s steps that need more don't compile: narrow the range or coarsen the step. |
+| A rotation's error | 0.001 to 45 degrees. |
+| A bound | A whole number up to 16,777,215. |
+| An enum | At least 2 values. |
+| A union | At least 2 variants. |
+| A struct | At least 1 field. |
+| An unreliable event | No Instances. |
+
+## Wide events
+
+| | Limit | What to do |
+| --- | --- | --- |
+| Fields in one event | About 90 numbers, bools and strings, or about 50 vectors, CFrames and `f64`s. Past that, Luau can't load the module. | Group fields into structs: a struct is one argument. |
+
+## Messages and frames
+
+| | Limit | What to do |
+| --- | --- | --- |
+| One reliable message | It must fit in an empty stream, 1 MiB by default. A bigger one makes `Fire` error. | Raise `ReliableCapacity`, or split the message. |
+| One unreliable message | It must fit in 900 bytes. | Send it reliable, or split it. |
+| A frame from a client | 64 KB by default. Bigger ones are refused unread. | Raise `MaxFrameBytes`. |
+| A list of bare Instances | 1,024 in one message. | |
+
+## Calls
+
+| | Limit |
+| --- | --- |
+| Waiting for an answer | 30 seconds by default, `InvokeTimeout`. |
+| Calls waiting at once | 65,536 per player on the server, and on each client. |
+| A failed call's reason | 200 bytes. |
+
+## Type checking
+
+| | Limit |
+| --- | --- |
+| A huge schema | Past 10,000 lines, or with one function over 1,000, `Implementation.luau` is written `--!nocheck` so luau-lsp doesn't give up on it. `init.luau` is always checked, so your scripts keep every type. |

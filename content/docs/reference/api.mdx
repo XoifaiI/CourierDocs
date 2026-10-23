@@ -1,0 +1,76 @@
+---
+title: API
+description: Every member of the module the compiler writes, and the types it exports.
+---
+
+Look up what your schema's module has.
+
+```luau
+local Net = require(ReplicatedStorage.Net)
+
+Net.Hit.FireAll(25, 75)
+
+local Stop: () -> () = Net.Click.On(function(Player: Player)
+	print(Player, "clicked")
+end)
+```
+
+Each event and function in the schema is a table on the module, named as in the schema. Every member is typed from the schema. Calling one on the wrong side errors, such as `Hit.Fire is server only`.
+
+## Events from Server
+
+| Member | Side | What it does |
+| --- | --- | --- |
+| `Fire(Recipient, ...)` | Server | Sends to one player. |
+| `FireAll(...)` | Server | Sends to every player in the server. |
+| `FireExcept(Except, ...)` | Server | Sends to every player but one. |
+| `FireList(Recipients, ...)` | Server | Sends to each player in a list. |
+| `On(Handler)` | Client | Sets the listener, `function(...)`. Gives back a function that removes it. |
+| `AddMiddleware(Middleware)` | Client | Adds a [middleware](/docs/learn/middleware). Gives back a function that removes it. |
+
+## Events from Client
+
+| Member | Side | What it does |
+| --- | --- | --- |
+| `Fire(...)` | Client | Sends to the server. |
+| `On(Handler)` | Server | Sets the listener, `function(Player, ...)`. Gives back a function that removes it. |
+| `AddMiddleware(Middleware)` | Server | Adds a middleware. Gives back a function that removes it. |
+
+## Functions
+
+| Member | Side | What it does |
+| --- | --- | --- |
+| `Invoke(...)` | The caller | Asks, and gives back a [Future](/docs/reference/runtime#future) of the results. A function `from Server` takes the player first: `Invoke(Recipient, ...)`. |
+| `On(Handler)` | The other side | Sets the handler, which returns the results. On the server it gets the player first. Gives back a function that removes it. |
+| `AddMiddleware(Middleware)` | The other side | Adds a middleware. Rejecting answers the caller with the reason. |
+
+One listener per event or function: `On` replaces the last one. A message that arrives with no listener is dropped. A call that arrives with no handler is answered `nothing handles this call`.
+
+## The module
+
+| Member | What it does |
+| --- | --- |
+| `Net.AddMiddleware(Middleware)` | Adds a middleware to every event and function this side receives. Gives back a function that removes it. |
+
+## Types
+
+`init.luau` exports every type your scripts need:
+
+| Type | What it is |
+| --- | --- |
+| Each enum, struct and union | As declared, such as `Net.Weapon` or `Net.Item`. |
+| `Net.Calls` | Every call this side can receive in middleware, a union narrowed by `Name`. |
+| `Net.Call<"Buy">` | The call one middleware of `Buy` gets. Naming an event the schema doesn't have is an error. |
+| `Net.Future<T...>` | A [Future](/docs/reference/runtime#future). |
+| `Net.BuyResult` | What a function's reply holds: `{ Kind: "Ok", ... }` with the results, or `{ Kind: "Error", Reason: string }`. |
+| `Net.Api` | The module itself. |
+
+## Call
+
+| Field | Type | What it is |
+| --- | --- | --- |
+| `Name` | The event's name | Read only. |
+| `Player` | `Player` on the server, `nil` on a client | The sender. Read only. |
+| `Args` | The event's fields, by name | Change a field and the handler gets the new value. |
+| `Shared` | `{ [unknown]: unknown }` | A table for this message, shared by its middleware. |
+| `Reject(Reason)` | Method | Stops the message. A rejected function call is answered with `Reason`. |

@@ -1,0 +1,88 @@
+---
+title: Functions
+description: Ask the other side something and wait for the answer.
+---
+
+An event only goes one way. A function sends a message and gets an answer back, like a `RemoteFunction`:
+
+```courier
+function Buy from Client { Item: u16, Count: u8 } -> { Granted: bool, Balance: u32 }
+```
+
+The fields before `->` are what the caller sends. The fields after it are what the handler returns.
+
+## Calling a function
+
+`Invoke` gives you a [Future](/docs/reference/runtime#future), which holds the answer once it arrives:
+
+```luau
+local Call: Net.Future<boolean, number> = Net.Buy.Invoke(5, 3)
+local Granted: boolean, Balance: number = Call:Wait()
+```
+
+`Wait` yields until the answer arrives, then gives you the results in the order the schema lists them.
+
+## Answering a call
+
+Set the handler with `On`, the same as for an event, and return the results:
+
+```luau
+Net.Buy.On(function(Player: Player, Item: number, Count: number): (boolean, number)
+	local Balance: number = Wallets[Player] or 0
+	local Price: number = Prices[Item] * Count
+	if Balance < Price then
+		return false, Balance
+	end
+
+	Wallets[Player] = Balance - Price
+	return true, Balance - Price
+end)
+```
+
+The results are typed, so returning a string where `Granted` should be is an error in your editor.
+
+## When a call fails
+
+Sometimes a call never gets an answer. When that happens, `Wait` gives you nothing, and `Cancelled` tells you why:
+
+```luau
+local Call: Net.Future<boolean, number> = Net.Buy.Invoke(5, 3)
+local Granted: boolean, Balance: number = Call:Wait()
+if not Call:Happened() then
+	local _, Why: string = Call:Cancelled()
+	warn("Couldn't buy:", Why)
+	return
+end
+
+print(Granted, Balance)
+```
+
+Always check `Happened` before you use the results. When a call fails, the results are `nil`, even though their types say they aren't.
+
+| Reason | What happened |
+| --- | --- |
+| `the handler failed` | The handler errored. The error shows in the output on the side that ran it. It isn't sent to the caller. |
+| `nothing handles this call` | Nothing had called `On` when the call arrived. |
+| Your own reason | A [middleware](/docs/learn/middleware) rejected the call. |
+| `the player left` | The player the call was waiting on left the game. |
+| `Future timed out` | No answer came back within `Courier.Config.InvokeTimeout`, 30 seconds by default. |
+
+A reason is at most 200 bytes.
+
+You can also give `Wait` a timeout. `Call:Wait(5)` gives you nothing if 5 seconds pass first, but the call keeps waiting for its answer until it gets one or times out.
+
+## Asking a client
+
+A function `from Server` lets the server ask one player something:
+
+```courier
+function Confirm from Server { Question: string(..100) } -> { Yes: bool }
+```
+
+```luau
+local Yes: boolean = Net.Confirm.Invoke(Player, "Sell your sword?"):Wait()
+```
+
+A client can answer with anything, or never answer at all. The call times out by itself, so your server never gets stuck waiting. Check the answer before you act on it, like anything else a client sends.
+
+Next: [Instances](/docs/learn/instances)

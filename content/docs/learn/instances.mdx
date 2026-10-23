@@ -1,0 +1,85 @@
+---
+title: Instances
+description: Send parts and models, and wait for ones that haven't streamed in yet.
+---
+
+A field can hold an Instance. Instances don't take any bits in the message: Roblox sends them separately, the same way it sends an Instance you pass to a `RemoteEvent`, and Courier puts each one back in its field.
+
+```courier
+event Spawned from Server {
+	Boss: Instance(Model),
+	Drops: Instance(BasePart)[..8],
+}
+
+event Grab from Client { Part: Instance(BasePart) }
+```
+
+| Type | You send | It arrives as |
+| --- | --- | --- |
+| `Instance` | Any Instance | `Instance?` |
+| `Instance(BasePart)` | A `BasePart` | `BasePart?` |
+| `Handle` | An `InstanceHandle` | An `InstanceHandle`, never `nil` |
+
+## Why an Instance can arrive as nil
+
+Roblox sends `nil` for an Instance the player doesn't have. With StreamingEnabled, a part far away from a player hasn't streamed in for them yet. A part in `ServerStorage`, or one destroyed before the message arrived, never reaches them at all. That's why a received Instance is always typed as possibly `nil`:
+
+```luau
+Net.Spawned.On(function(Boss: Model?, Drops: { BasePart })
+	if Boss then
+		print("the boss is", Boss.Name)
+	end
+
+	print(#Drops, "drops arrived")
+end)
+```
+
+A list only keeps the Instances that arrived, so `Drops` can be shorter than the list the server sent, but it never has a `nil` in it.
+
+## Waiting for an Instance
+
+If the client needs an Instance even when it hasn't streamed in yet, send a `Handle` instead. A `Handle` is Roblox's `InstanceHandle`. It always arrives, even when the Instance hasn't, and you can wait for the Instance with it:
+
+```courier
+event Marked from Server { Target: Handle }
+```
+
+```luau
+-- server
+Net.Marked.FireAll(InstanceHandle.new(Chest))
+
+-- client
+Net.Marked.On(function(Target: InstanceHandle)
+	local Chest: Instance? = Target:Wait(10)
+	if Chest then
+		Highlight.Adornee = Chest
+	end
+end)
+```
+
+`Target:Get()` gives you the Instance if it's already there, without waiting.
+
+## Instances sent by clients
+
+A client can send anything it likes, so the server checks every Instance a client sends. It has to be a real Instance, of the class the schema says. If it isn't, Courier stops reading the client's messages for that frame, and your handler never sees it.
+
+```luau
+Net.Grab.On(function(Player: Player, Part: BasePart?)
+	if Part == nil then
+		return -- the part was destroyed before the message arrived
+	end
+
+	local Character: Model? = Player.Character
+	if Character == nil or (Part.Position - Character:GetPivot().Position).Magnitude > 10 then
+		return -- too far away to grab
+	end
+
+	Part:SetNetworkOwner(Player)
+end)
+```
+
+Courier checks that `Part` is a `BasePart`. Whether the player is allowed to grab it is still up to you.
+
+Unreliable events can't carry Instances.
+
+Next: [Middleware](/docs/learn/middleware)

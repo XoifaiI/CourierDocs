@@ -1,0 +1,16 @@
+{
+  "title": "Learn",
+  "pages": [
+    "getting-started",
+    "schemas",
+    "types",
+    "sending",
+    "functions",
+    "instances",
+    "middleware",
+    "trusting-clients",
+    "project-setup",
+    "editor",
+    "common-mistakes"
+  ]
+}

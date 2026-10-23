@@ -1,0 +1,133 @@
+---
+title: Getting started
+description: Install the compiler, write your first schema, and send your first message.
+---
+
+## Install
+
+Courier is a compiler. Install it with [Rokit](https://github.com/rojo-rbx/rokit) in your project folder:
+
+```sh
+rokit add xoifaii/Courier
+```
+
+That gives you the `courier` command. Then install the editor extension, which shows errors and sizes as you type:
+
+```sh
+courier vscode
+```
+
+It installs into VS Code, Cursor and Windsurf, if you have them. See [Editor](/docs/learn/editor).
+
+You don't install anything into your game yourself. The compiler writes the runtime into the same folder as your schema.
+
+## Make a schema
+
+A schema goes in a folder of its own, and that folder becomes the module your scripts require. Make a `src/Net` folder, and have Rojo sync it to `ReplicatedStorage.Net`:
+
+```json title="default.project.json"
+{
+  "name": "Clicker",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Net": { "$path": "src/Net" }
+    },
+    "ServerScriptService": {
+      "Server": { "$path": "src/Server.server.luau" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": { "$path": "src/Client.client.luau" }
+      }
+    }
+  }
+}
+```
+
+Now write the schema in `src/Net/Net.courier`:
+
+```courier
+event Click from Client {}
+
+event Coins from Server { Amount: u32 }
+```
+
+This declares two messages:
+
+- **`Click`** is sent by a client to the server, and carries nothing. It costs 1 bit.
+- **`Coins`** is sent by the server to a client, and carries a number from 0 to 4,294,967,295. It costs 33 bits: 32 for the number, and 1 to say which message it is.
+
+## Compile the schema
+
+From your project folder, run:
+
+```sh
+courier watch
+```
+
+`courier watch` finds every folder with a `.courier` file in it, and compiles each one into that folder:
+
+| File | What it is |
+| --- | --- |
+| `init.luau` | The module your scripts require, with all the types. |
+| `Implementation.luau` | The code that packs and checks every message. |
+| `Courier/` | The runtime: remotes, sending, middleware and calls. |
+
+Leave it running. It compiles again every time you save a schema. Rojo syncs the new files into Studio, and leaves the `.courier` file out of your game.
+
+## Send a message
+
+The server gives the player a coin for every click, and tells them how many they have. In `src/Server.server.luau`:
+
+```luau
+--!strict
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Net = require(ReplicatedStorage.Net)
+
+local CoinsByPlayer: { [Player]: number } = {}
+
+Net.Click.On(function(Player: Player)
+	local Coins: number = (CoinsByPlayer[Player] or 0) + 1
+	CoinsByPlayer[Player] = Coins
+	Net.Coins.Fire(Player, Coins)
+end)
+
+Players.PlayerRemoving:Connect(function(Player: Player)
+	CoinsByPlayer[Player] = nil
+end)
+```
+
+The client listens for coins, and fires `Click` when the player clicks. In `src/Client.client.luau`:
+
+```luau
+--!strict
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local Net = require(ReplicatedStorage.Net)
+
+Net.Coins.On(function(Amount: number)
+	print("I have", Amount, "coins")
+end)
+
+UserInputService.InputBegan:Connect(function(Input: InputObject, Processed: boolean)
+	if not Processed and Input.UserInputType == Enum.UserInputType.MouseButton1 then
+		Net.Click.Fire()
+	end
+end)
+```
+
+Press Play and click. Each click prints one more coin.
+
+Here's what each part does:
+
+- **`Net.Click.On`** runs your function every time the server gets a `Click`. On the server, the first argument is always the player who sent it.
+- **`Net.Coins.Fire(Player, Coins)`** sends `Coins` to one player. A client's `Fire` takes no player, since it always sends to the server.
+- **Everything is typed from the schema.** `Amount` is a `number`, and `Net.Coins.Fire(Player, "lots")` shows as an error in your editor before you ever press Play.
+
+`Fire` doesn't send the message straight away. Everything a player is sent in one frame is packed together, and sent once per Heartbeat in one remote call.
+
+Next: [Schemas](/docs/learn/schemas)

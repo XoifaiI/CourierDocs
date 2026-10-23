@@ -1,0 +1,127 @@
+---
+title: Types
+description: Picking a type for each field, how many bits it costs, and what happens to a value that doesn't fit.
+---
+
+Every field has a type, and the type decides how many bits the field takes. The more exactly you describe a value, the fewer bits it needs. The editor shows each field's size as you type, so you can try a type and see what it costs.
+
+## Numbers
+
+| Type | Holds | Bits |
+| --- | --- | --- |
+| `u8`, `u16`, `u32`, any `u1` to `u32` | Whole numbers from 0 to 2^N - 1 | N |
+| `i8`, `i16`, `i32`, any `i1` to `i32` | Whole numbers from -2^(N-1) to 2^(N-1) - 1 | N |
+| `int(0..100)` | Whole numbers in the range | As few as the range needs: 7 here |
+| `float(0..1, 0.01)` | Numbers in the range, rounded to the step | As few as the steps need: 7 here |
+| `f32` | Any number, at 32 bit float precision | 32 |
+| `f64` | Any number, exactly | 64 |
+
+Pick the smallest one that holds your value:
+
+```courier
+event Hit from Server unreliable {
+	Damage: int(0..100),        -- 7 bits
+	Health: int(0..100),        -- 7 bits
+	Charge: float(0..1, 0.01),  -- 7 bits
+}
+```
+
+A range like `0..100` needs 7 bits, but only uses 101 of the 128 values 7 bits can hold. Courier packs fields like these together so the unused values aren't wasted. `Damage` and `Health` take 14 bits between them, and all three fields take 20.
+
+If you send a value that doesn't fit:
+
+- **`u8`, `i16` and the other sized types wrap**, like `buffer.writeu8`. 256 sent as a `u8` arrives as 0.
+- **`int` and `float` ranges clamp.** 150 sent as `int(0..100)` arrives as 100.
+- **`float` rounds to the nearest step.** 0.256 sent as `float(0..1, 0.01)` arrives as 0.26.
+- **`f32` and `f64` don't allow NaN or infinity.** `Fire` errors, and the error names the event and the field.
+
+## Positions and rotations
+
+| Type | Luau type | Bits |
+| --- | --- | --- |
+| `vector` | `Vector3`, each axis an `f32` | 96 |
+| `vector(-1..1, 0.001)` | `Vector3`, each axis in the range, rounded to the step | 33 here |
+| `rotation(1)` | `CFrame`, only its rotation, off by at most 1 degree | 26 here |
+| `cframe(-1000..1000, 0.01, 0.5)` | `CFrame`, with its position rounded and its rotation off by at most 0.5 degrees | 83 here |
+
+A rotation can be off by 0.001 to 45 degrees. No rotation and every quarter turn always arrive exactly.
+
+## Strings and buffers
+
+| Type | Holds | Bits |
+| --- | --- | --- |
+| `string` | Any string | Its length, then its bytes |
+| `string(..32)` | Up to 32 bytes | 6 for its length, then its bytes |
+| `string(8)` | Exactly 8 bytes | Only its bytes |
+| `buffer`, `buffer(..64)` | The same as `string`, for a `buffer` | The same |
+
+A string longer than its limit is cut short when you send it. A string shorter than its minimum makes `Fire` error.
+
+## Bools
+
+`bool` is 1 bit.
+
+## Your own types
+
+Declare a type once and use it in any event:
+
+```courier
+enum Weapon { Sword, Bow, Staff }
+
+struct Item {
+	Id: u16,
+	Count: u8,
+}
+
+union Reward {
+	Coins { Amount: u16 },
+	Gear { Item: Item },
+	Nothing,
+}
+```
+
+| Kind | Luau type | Bits |
+| --- | --- | --- |
+| `enum` | One of its values, as a string: `"Sword" \| "Bow" \| "Staff"` | As few as its values need: 2 here |
+| `struct` | A table of its fields: `{ Id: number, Count: number }` | All its fields: 24 here |
+| `union` | One of its variants, with `Kind` naming which: `{ Kind = "Coins", Amount = 50 }` | Which variant, then that variant's fields |
+
+Sending an enum value or a variant that isn't in the type makes `Fire` error.
+
+## Optional values
+
+Add `?` to a type to allow `nil`:
+
+```courier
+event Equipped from Server {
+	Weapon: Weapon?,   -- 2 bits, since Weapon has a value to spare for nil
+	Item: Item?,       -- 1 bit when nil, 25 when not
+}
+```
+
+An optional enum or union usually costs nothing extra, since `nil` can use one of its spare values. Any other optional value costs 1 bit to say whether it's there.
+
+## Lists and maps
+
+| Type | Holds | Bits |
+| --- | --- | --- |
+| `u8[4]` | Exactly 4 items | Its items: 32 here |
+| `u8[..10]` | Up to 10 items | 4 for how many, then its items |
+| `u8[2..10]` | 2 to 10 items | 4 for how many, then its items |
+| `u8[]` | Any number of items | How many, then its items |
+| `map(string(..16), u16)` | A table of keys and values | How many, then each key and value |
+| `map(Weapon, u8, ..3)` | Up to 3 keys | 2 for how many, then each key and value |
+
+A list with more items than its limit is cut short when you send it. A map with more keys than its limit makes `Fire` error, since a table has no order to decide which keys to drop.
+
+Lists and maps can't hold optional values, since a Luau table can't hold `nil`. Use a list of structs with an optional field instead.
+
+A map's keys can be `bool`, a number type, an enum or a string.
+
+Bools in a list take 1 bit each, and small ranges in a list are packed together too, so each item of `int(0..2)[..100]` takes under 2 bits.
+
+## Instances
+
+`Instance`, `Instance(BasePart)` and `Handle` send parts and models. They don't take any bits in the message, since Roblox sends Instances separately. See [Instances](/docs/learn/instances).
+
+Next: [Sending messages](/docs/learn/sending)

@@ -1,0 +1,64 @@
+---
+title: Trusting clients
+description: What Courier checks in everything a client sends, and what you still need to check yourself.
+---
+
+An exploiter can fire your remotes with anything: random bytes, half a message, a table where a buffer should be, or a list that claims to have millions of items. Courier checks everything a client sends before your code sees it.
+
+## What Courier checks
+
+Courier checks every value a client sends against the schema as it reads it:
+
+- Numbers are inside their range, and an `f32` or `f64` isn't NaN or infinity.
+- Enum values and union variants exist.
+- Lists, maps and strings are within their limits, and actually fit in what the client sent, before Courier makes a table for them.
+- Every Instance is a real Instance, of the class the schema says.
+- No message stops halfway through.
+
+As soon as a value fails, Courier stops reading the rest of what the client sent that frame. The bad message, and every message after it, never reach a handler. Your handlers only ever get values the schema allows.
+
+A client can't make the server do much work with a small message. A list can't claim more items than the bytes the client sent could hold, so the server never builds a huge table from a tiny message.
+
+Courier won't read more than `Courier.Config.MaxFrameBytes` from a client in one frame, 64 KB by default. If your clients send more than that, raise it. See [Project setup](/docs/learn/project-setup#settings).
+
+## What you still need to check
+
+The schema checks what a message contains, not whether the player is allowed to send it. Check these yourself, in a handler or in [middleware](/docs/learn/middleware):
+
+- **Your game's rules.** Can the player afford it? Is the part close enough to grab? Has the cooldown finished?
+- **How often players send.** See the [rate limit example](/docs/learn/middleware#example-rate-limits).
+- **Answers from clients.** Whatever a client returns from a [function](/docs/learn/functions#asking-a-client) could be anything the client wants.
+
+## Kicking clients that send bad messages
+
+`Courier.Config.OnFrame` is called for every frame a client sends, and tells you whether it was read without a problem. A client that keeps sending bad messages is either broken or an exploiter:
+
+```luau
+--!strict
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Courier = require(ReplicatedStorage.Net.Courier)
+
+local Strikes: { [Player]: number } = {}
+
+Courier.Config.OnFrame = function(Player: Player, Success: boolean)
+	if Success then
+		return
+	end
+
+	local Count: number = (Strikes[Player] or 0) + 1
+	Strikes[Player] = Count
+	if Count >= 3 then
+		Player:Kick("Bad network data")
+	end
+end
+
+Players.PlayerRemoving:Connect(function(Player: Player)
+	Strikes[Player] = nil
+end)
+```
+
+`Net.Courier` is the runtime the compiler wrote into your schema's folder, the same one `Net` uses.
+
+Next: [Project setup](/docs/learn/project-setup)

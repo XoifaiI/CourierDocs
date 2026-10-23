@@ -1,0 +1,39 @@
+---
+title: Editor
+description: Sizes as you type, errors, rename and completion for .courier files.
+---
+
+The editor extension uses the compiler itself to read your schemas, so what it shows always matches what the compiler does.
+
+## Install
+
+```sh
+courier vscode
+```
+
+The extension comes with the `courier` command, and this installs it into every editor it finds: VS Code, VS Code Insiders, Cursor and Windsurf. Run it again after you update Courier, so the extension matches the new compiler.
+
+If it can't find your editor, open VS Code, run **Shell Command: Install 'code' command in PATH** from the command palette, and try again.
+
+## Features
+
+- **Sizes as you type.** Every field shows how many bits it costs, and every event shows the size of one message, including its id.
+- **Hover** over a type to see what it holds, or over an event to see its size and which fields change it.
+- **Errors as you type**, in the file they're in, across every schema in the folder.
+- **Go to definition and find references**, across all the files in the folder.
+- **Rename** an enum, struct, union, event, function or field everywhere it's used. A rename that would break the schema is refused.
+- **Completion** for whatever can go where your cursor is: declarations, `from`, `Server` or `Client`, `unreliable`, and types after a `:`.
+- **Compile on save.** Saving a schema compiles its folder, so you don't need `courier watch` running.
+
+The size shown on a field is its size on its own. Inside an event, fields that get packed together can cost a little less, so an event can be smaller than its fields added up.
+
+## Settings
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `courier.path` | `courier` | The compiler to run: a name on PATH, as Rokit installs it, or a full path. |
+| `courier.compileOnSave` | `true` | Compile a schema's folder whenever a schema in it is saved. |
+
+The sizes are VS Code inlay hints. Turn them off with `editor.inlayHints.enabled`.
+
+Next: [Common mistakes](/docs/learn/common-mistakes)

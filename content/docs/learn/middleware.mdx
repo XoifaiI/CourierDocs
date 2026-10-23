@@ -1,0 +1,121 @@
+---
+title: Middleware
+description: Run your own checks before a handler, on one event or on every event.
+---
+
+A middleware is a function that runs before an event's handler. It can read the message, change it, or reject it so the handler never runs. Rate limits, logging and extra checks are all middleware you write yourself.
+
+A middleware runs on the side that receives the message: on the server for messages from clients, and on the client for messages from the server.
+
+## Adding middleware to one event
+
+```luau
+Net.Buy.AddMiddleware(function(Call: Net.Call<"Buy">)
+	if Call.Args.Count > 10 then
+		Call:Reject("you can buy at most 10 at once")
+	end
+end)
+```
+
+`Call` is typed from the schema, so `Call.Args.Count` is a `number`, and a typo like `Call.Args.Cuont` is an error in your editor.
+
+| Field | What it is |
+| --- | --- |
+| `Call.Name` | The event's name, like `"Buy"`. |
+| `Call.Player` | The player who sent it. `nil` on a client. |
+| `Call.Args` | The message's fields, by name. If you change one, the handler gets the new value. |
+| `Call.Shared` | An empty table for this message. Every middleware the message goes through sees the same one. |
+| `Call:Reject(Reason)` | Stops the message, so the handler never runs. |
+
+If you reject a call to a [function](/docs/learn/functions), the caller gets your reason from `Cancelled`.
+
+## Adding middleware to every event
+
+`Net.AddMiddleware` adds a middleware to every event the server or client receives. Check `Call.Name` to see which event it is, and the types of the other fields follow from it:
+
+```luau
+Net.AddMiddleware(function(Call: Net.Calls)
+	if Call.Name == "Buy" then
+		print(Call.Player, "wants", Call.Args.Count, "of item", Call.Args.Item)
+	end
+end)
+```
+
+## Order and removing middleware
+
+Middleware runs in the order you added it, and stops at the first `Reject`. Adding the same function to an event twice does nothing.
+
+`AddMiddleware` gives you back a function that removes it again:
+
+```luau
+local Remove: () -> () = Net.AddMiddleware(LogEverything)
+task.delay(60, Remove)
+```
+
+An event with no middleware costs nothing extra. An event with middleware makes one `Call` table per message.
+
+## Writing a middleware as its own function
+
+To write a middleware as a separate function, type its argument with `Net.Call` and the event's name:
+
+```luau
+local function LimitCount(Call: Net.Call<"Buy">)
+	if Call.Args.Count > 10 then
+		Call:Reject("you can buy at most 10 at once")
+	end
+end
+
+Net.Buy.AddMiddleware(LimitCount)
+```
+
+For a middleware that takes every event, use `Net.Calls`.
+
+## Example: rate limits
+
+Courier doesn't limit how often players can send messages. This middleware lets each player send any event 20 times in a row, refilling 5 a second, and rejects the rest:
+
+```luau
+--!strict
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Net = require(ReplicatedStorage.Net)
+
+local BURST = 20
+local PER_SECOND = 5
+
+type Bucket = { Tokens: number, Last: number }
+
+local Buckets: { [Player]: { [string]: Bucket } } = {}
+
+Net.AddMiddleware(function(Call: Net.Calls)
+	local Player: Player? = Call.Player
+	if Player == nil then
+		return -- from the server, which needs no limit
+	end
+
+	local ByEvent: { [string]: Bucket } = Buckets[Player] or {}
+	Buckets[Player] = ByEvent
+
+	local Now: number = os.clock()
+	local Bucket: Bucket = ByEvent[Call.Name] or { Tokens = BURST, Last = Now }
+	ByEvent[Call.Name] = Bucket
+	Bucket.Tokens = math.min(BURST, Bucket.Tokens + (Now - Bucket.Last) * PER_SECOND)
+	Bucket.Last = Now
+
+	if Bucket.Tokens < 1 then
+		Call:Reject("too many messages")
+		return
+	end
+
+	Bucket.Tokens -= 1
+end)
+
+Players.PlayerRemoving:Connect(function(Player: Player)
+	Buckets[Player] = nil
+end)
+```
+
+For different limits on different events, add a copy to each event with its own numbers, like `Net.Shoot.AddMiddleware`.
+
+Next: [Trusting clients](/docs/learn/trusting-clients)

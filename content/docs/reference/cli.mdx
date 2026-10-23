@@ -1,0 +1,39 @@
+---
+title: CLI
+description: Every courier command and flag.
+---
+
+```sh
+courier                                   # compile every schema folder under here
+courier watch                             # the same, and again on every change
+courier vscode                            # install the editor extension
+courier src/Net                           # compile one folder
+```
+
+| Command | What it does |
+| --- | --- |
+| `courier` | Compiles every folder under the current one that holds a `.courier` file, each into itself. Skips hidden folders, `node_modules`, `Packages` and `target`. |
+| `courier watch` | Compiles every folder, then again whenever a schema in it changes, appears or goes. Looks for new folders every 2 seconds. Stop it with Ctrl+C. |
+| `courier vscode` | Installs the editor extension the binary carries into VS Code, VS Code Insiders, Cursor and Windsurf, whichever it finds. |
+| `courier lsp` | The language server the editor extension runs. You don't run it yourself. |
+| `courier <folder> [<output>]` | Compiles one folder, into itself or into `<output>`. |
+| `courier <file> [<output>]` | Compiles one `.courier` file as a schema of its own, into its folder or into `<output>`. |
+
+## Flags
+
+| Flag | What it does |
+| --- | --- |
+| `--runtime <path>` | Requires the runtime from `<path>` instead of writing one next to the schema, such as `ReplicatedStorage.Packages.Courier`. Each step is waited for. Pass a Luau expression instead when it holds a call. |
+| `--codec` | Writes the bare encoder and decoder to `<output>`, a file, with no runtime or API. For tests and benchmarks. |
+
+## Errors
+
+A schema error names the file, line and column, with a caret under it:
+
+```text
+src/Net/Combat.courier:4:10: unknown type "Weapn"; declare it as an enum, struct or union in any schema of this folder
+4 | 	Weapon: Weapn,
+  | 	        ^
+```
+
+`courier` exits with a failure when any schema failed to compile, so you can run it in CI before `rojo build`.

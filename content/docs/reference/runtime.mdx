@@ -1,0 +1,51 @@
+---
+title: Runtime
+description: The runtime's settings, and the Future a function call gives back.
+---
+
+The runtime is the `Courier` folder the compiler writes next to your schema. Your scripts use it through your schema's module; you only require it directly for its settings.
+
+```luau
+local Courier = require(ReplicatedStorage.Net.Courier)
+Courier.Config.MaxFrameBytes = 256 * 1024
+```
+
+## Config
+
+| Setting | Type | Default | Read |
+| --- | --- | --- | --- |
+| `ReliableCapacity` | `number` | 1,048,576 bytes | When a stream is made: set it before the schema is first required. |
+| `UnreliableCapacity` | `number` | 900 bytes | When a stream is made. |
+| `InvokeTimeout` | `number` | 30 seconds | On each call. |
+| `MaxFrameBytes` | `number` | 65,536 bytes | On each frame a client sends. Server only. |
+| `OnFrame` | `((Player, Success: boolean) -> ())?` | `nil` | On each frame a client sends. Server only. |
+
+| Setting | What it does |
+| --- | --- |
+| `ReliableCapacity` | How many bytes a reliable stream holds before it's sent early, mid frame. Memory for it is taken up front: on the server, once per player. |
+| `UnreliableCapacity` | The same for unreliable messages. Roblox drops an unreliable call over 1,000 bytes. |
+| `InvokeTimeout` | How long a call waits for its answer before it fails with `Future timed out`. |
+| `MaxFrameBytes` | A bigger frame from a client is refused unread. The first one warns. |
+| `OnFrame` | Told whether each frame from a client was read cleanly. |
+
+## Future
+
+`Invoke` gives back a Future: a call whose answer you can wait for.
+
+```luau
+local Call: Net.Future<boolean, number> = Net.Buy.Invoke(5, 3)
+local Granted: boolean, Balance: number = Call:Wait()
+if not Call:Happened() then
+	warn(select(2, Call:Cancelled()))
+end
+```
+
+| Call | What it does |
+| --- | --- |
+| `Wait(Timeout?)` | Yields until the answer is in, and gives the results. Gives nothing if the call failed, or if `Timeout` seconds pass first. |
+| `Happened()` | `true` once the call answered with results. |
+| `Cancelled()` | `true` and the reason, if the call failed or was cancelled. `false` otherwise. |
+| `Data()` | The results, without waiting. Errors if there's no answer yet. |
+| `Cancel()` | Stops waiting. Anyone waiting gets nothing. Errors if the call already ended. |
+
+A call that's still waiting is neither `Happened` nor `Cancelled`.

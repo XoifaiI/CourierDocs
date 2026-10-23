@@ -1,0 +1,67 @@
+---
+title: Sending messages
+description: Fire to one player, every player, or a list of players, and listen with On.
+---
+
+Each event in your schema is a table on the module, like `Net.Coins` or `Net.Click`. The server and the client get different functions on it.
+
+## Sending from the server
+
+The server fires an event `from Server`, to whichever players you pick:
+
+```luau
+Net.Hit.Fire(Player, 25, 75)             -- one player
+Net.Hit.FireAll(25, 75)                  -- every player in the server
+Net.Hit.FireExcept(Player, 25, 75)       -- every player but one
+Net.Hit.FireList({ PlayerA, PlayerB }, 25, 75) -- the players in the list
+```
+
+When a message has strings or lists in it, Courier packs it once and copies it to each player, instead of packing it again for every player.
+
+## Sending from a client
+
+A client fires an event `from Client`. It always goes to the server, so `Fire` doesn't take a player:
+
+```luau
+Net.Click.Fire()
+```
+
+## Listening
+
+`On` runs your function every time a message for that event arrives:
+
+```luau
+-- on the server, for an event from Client: the first argument is the player who sent it
+Net.Click.On(function(Player: Player)
+	print(Player.Name, "clicked")
+end)
+
+-- on a client, for an event from Server: there's no player, since it's always from the server
+Net.Hit.On(function(Damage: number, Health: number)
+	print("took", Damage, "and have", Health, "left")
+end)
+```
+
+Your function runs on its own thread, so it can yield. If it errors, the error shows in the output, and the other messages still arrive.
+
+Each event has one listener. Calling `On` again replaces the last one. `On` gives you back a function that stops listening:
+
+```luau
+local Stop: () -> () = Net.Hit.On(function(Damage: number, Health: number)
+	print(Damage, Health)
+end)
+
+Stop() -- Hit messages are dropped from now on
+```
+
+If a message arrives while nothing is listening, it's dropped. So call `On` before the other side might send anything, usually at the top of your script.
+
+Calling a function on the wrong side errors. For example, `Net.Hit.Fire` on a client errors with `Hit.Fire is server only`.
+
+## When messages are sent
+
+`Fire` doesn't send anything straight away. It adds the message to that player's queue, and every queue is sent once per Heartbeat, in one remote call per player. Everything you fire in one frame arrives together, in the order you fired it.
+
+Reliable and unreliable messages go through different remotes, so they're sent separately. If a player's reliable messages in one frame add up to more than 1 MiB, Courier sends them in more than one call. You can change that with `Courier.Config.ReliableCapacity`. See [Project setup](/docs/learn/project-setup#settings).
+
+Next: [Functions](/docs/learn/functions)

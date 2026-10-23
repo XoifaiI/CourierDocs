@@ -1,0 +1,158 @@
+---
+title: Common mistakes
+description: The mistakes that cause most bugs with Courier, each with a wrong and a right version.
+---
+
+These are the mistakes that cause most bugs with Courier. Each one has a wrong version and a right version, and links to the page that covers it.
+
+## Firing before the client listens
+
+```luau
+-- Wrong: the client's script may not have called On yet, so this is dropped
+Players.PlayerAdded:Connect(function(Player: Player)
+	Net.Coins.Fire(Player, LoadCoins(Player))
+end)
+```
+
+```courier
+function GetCoins from Client {} -> { Amount: u32 }
+```
+
+```luau
+-- Right: the client asks once it's listening
+Net.GetCoins.On(function(Player: Player): number
+	return LoadCoins(Player)
+end)
+```
+
+```luau
+-- client
+Net.Coins.On(ShowCoins)
+ShowCoins(Net.GetCoins.Invoke():Wait())
+```
+
+A message that arrives while nothing listens is dropped. See [Sending messages](/docs/learn/sending#listening).
+
+## Using a failed call's results
+
+```luau
+-- Wrong: when the call fails, Granted is nil, even though it's typed boolean
+local Granted: boolean = Net.Buy.Invoke(5, 3):Wait()
+if not Granted then
+	warn("too expensive") -- or did it time out?
+end
+```
+
+```luau
+-- Right: check that the call happened first
+local Call: Net.Future<boolean, number> = Net.Buy.Invoke(5, 3)
+local Granted: boolean = Call:Wait()
+if not Call:Happened() then
+	warn("couldn't buy:", select(2, Call:Cancelled()))
+elseif not Granted then
+	warn("too expensive")
+end
+```
+
+See [Functions](/docs/learn/functions#when-a-call-fails).
+
+## Wrapping instead of clamping
+
+```courier
+-- Wrong: a u8 wraps, so 300 health arrives as 44
+event Health from Server { Value: u8 }
+```
+
+```courier
+-- Right: a range that holds every health your game has, and clamps past it
+event Health from Server { Value: int(0..500) }
+```
+
+See [Types](/docs/learn/types#numbers).
+
+## Expecting an Instance to arrive
+
+```courier
+-- Wrong: with StreamingEnabled, a far away part arrives as nil
+event Marked from Server { Target: Instance }
+```
+
+```luau
+Net.Marked.On(function(Target: Instance?)
+	Highlight.Adornee = Target -- nil until the part streams in, and it never updates
+end)
+```
+
+```courier
+-- Right: send a Handle, and wait for it
+event Marked from Server { Target: Handle }
+```
+
+```luau
+Net.Marked.On(function(Target: InstanceHandle)
+	Highlight.Adornee = Target:Wait(10)
+end)
+```
+
+See [Instances](/docs/learn/instances).
+
+## Two listeners on one event
+
+```luau
+-- Wrong: the second On replaces the first, so the leaderboard never updates
+Net.Coins.On(UpdateLeaderboard)
+Net.Coins.On(UpdateShop)
+```
+
+```luau
+-- Right: one listener that does both
+Net.Coins.On(function(Amount: number)
+	UpdateLeaderboard(Amount)
+	UpdateShop(Amount)
+end)
+```
+
+## Trusting what the client sends
+
+```luau
+-- Wrong: the schema says Count is 0 to 255, not that the player can afford it
+Net.Buy.On(function(Player: Player, Item: number, Count: number): (boolean, number)
+	GiveItems(Player, Item, Count)
+	return true, 0
+end)
+```
+
+```luau
+-- Right: check your game's rules yourself
+Net.Buy.On(function(Player: Player, Item: number, Count: number): (boolean, number)
+	local Price: number = Prices[Item] * Count
+	if Balance(Player) < Price then
+		return false, Balance(Player)
+	end
+
+	Charge(Player, Price)
+	GiveItems(Player, Item, Count)
+	return true, Balance(Player)
+end)
+```
+
+See [Trusting clients](/docs/learn/trusting-clients).
+
+## Setting stream sizes too late
+
+```luau
+-- Wrong: another script may have required Net first, and the streams are made
+local Net = require(ReplicatedStorage.Net)
+require(ReplicatedStorage.Net.Courier).Config.ReliableCapacity = 4 * 1024 * 1024
+```
+
+Set them in one module that every script requires instead. See [Project setup](/docs/learn/project-setup#settings).
+
+## Not requiring Net on the server
+
+```luau
+-- Wrong: only client scripts require Net, so the remotes are never made
+-- and every client waits forever
+```
+
+The first time the server requires `Net`, it makes the remotes. Require it from a server script, even if the server only listens.

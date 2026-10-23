@@ -1,0 +1,42 @@
+---
+title: Overview
+description: Courier sends Roblox messages in the fewest bytes it can. You write a schema, and the compiler turns it into typed Luau.
+---
+
+Courier is a networking library for Roblox. You list your game's messages in a schema, and the Courier compiler turns it into Luau that packs every value into as few bits as it needs, and checks every value it reads.
+
+```courier
+event Damaged from Server unreliable {
+	Amount: int(0..100),
+	Health: int(0..100),
+}
+```
+
+```luau
+Net.Damaged.FireAll(10, 90)
+```
+
+That message is 15 bits, including its id. Each number needs 7 bits, and Courier packs the two together into 14. The client's handler gets two numbers, typed, and never one outside `0..100`.
+
+## What it's for
+
+| Job | What you get |
+| --- | --- |
+| Events | Messages from the server to clients, or from clients to the server, reliable or unreliable. |
+| Functions | A client asks the server something and gets an answer back, or the other way round. |
+| Busy games | Everything a player gets in one frame goes out in one remote call, in as few bits as possible. |
+| Exploiters | Every value a client sends is checked against the schema before your code sees it. |
+| Rate limits and logging | Middleware you write, on one event or on all of them. |
+| Instances | Send parts and models, and wait for ones that haven't streamed in yet. |
+
+## What it isn't for
+
+- **Data that never changes.** For a value you set once and read forever, an attribute is simpler.
+- **Making Instances.** An Instance in a message refers to one Roblox has already replicated. Courier can't send a part to a client that doesn't have it. See [Instances](/docs/learn/instances).
+- **Sending any table.** Every message has to be declared in the schema first. Courier can't send a table it doesn't know the fields of.
+
+## Where to start
+
+The Learn pages build one game in order, starting with your first schema. Each page adds one thing. Start at the top and read them in order.
+
+Next: [Getting started](/docs/learn/getting-started)

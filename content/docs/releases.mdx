@@ -1,0 +1,37 @@
+---
+title: Releases
+description: What changed in each version of Courier, and what you have to change with it.
+---
+
+`+` is new, `~` works differently now, `-` is gone, `!` is something to know before you upgrade.
+
+## 0.2.0
+
+```diff
++ Every .courier file in a folder is one schema. Types work across files, in any order
++ courier compiles every schema folder under the current folder into itself, with the runtime
++ courier watch watches every schema folder, and finds new ones by itself
++ courier vscode installs the editor extension, which now comes with the compiler
++ Middleware is typed from the schema: Net.Buy.AddMiddleware, Net.AddMiddleware for every event, Net.Call<"Buy"> and Net.Calls
++ Call.Args holds the message's fields by name. Changing one changes what the handler gets
++ The editor shows sizes as you type, finds references, renames, completes for where your cursor is, and compiles on save
++ Events of up to about 90 fields compile and load, up from about 59
++ Maps are made at their full size before they're read: a 200 entry map reads about 13% faster
++ Compiling is about 25% faster
+~ The server makes the remotes the first time it requires the schema, and listens on them before clients can see them
+~ Implementation.luau is written --!nocheck when one of its functions passes 1,000 lines. init.luau keeps every type
+- .rbxmx output. Use Rojo
+- option output and option runtime in schemas. The schema's folder is where it compiles to, and --runtime is a flag
+- --watch. Use courier watch
+- Courier.Middleware and the built-in rate limiter
+! Move each schema into a folder of its own, then run courier in your project folder
+! A middleware is now a function of the event's Call
+```
+
+To upgrade, see [Project setup](/docs/learn/project-setup) for the folder layout, and [Middleware](/docs/learn/middleware) for the new middleware, including a [rate limit](/docs/learn/middleware#example-rate-limits) to replace the built-in one.
+
+## 0.1.0
+
+```diff
++ The first release: the schema compiler, the runtime, and the editor extension
+```

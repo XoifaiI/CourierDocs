@@ -1,0 +1,85 @@
+---
+title: Schema
+description: Every declaration and type a .courier file can hold.
+---
+
+Look up any part of a schema.
+
+```courier
+enum Weapon { Sword, Bow, Staff }
+
+struct Item { Id: u16, Count: u8 }
+
+union Reward { Coins { Amount: u16 }, Gear { Item: Item }, Nothing }
+
+event Shoot from Client { Weapon: Weapon, Aim: vector(-1..1, 0.001) }
+
+event Hit from Server unreliable { Damage: int(0..100) }
+
+function Buy from Client { Item: u16, Count: u8 } -> { Granted: bool, Balance: u32 }
+```
+
+Every `.courier` file in a folder is one schema. Declarations can come in any order, and in any file of the folder. `--` starts a comment that runs to the end of the line. A comma after the last item of a list is allowed.
+
+## Declarations
+
+| Declaration | Form | Rules |
+| --- | --- | --- |
+| `enum` | `enum Name { A, B, C }` | At least 2 values. |
+| `struct` | `struct Name { Field: Type, ... }` | At least 1 field. |
+| `union` | `union Name { A { Field: Type, ... }, B, ... }` | At least 2 variants. A variant may have no fields. |
+| `event` | `event Name from Server { Field: Type, ... }` | `from Server` or `from Client`. Add `unreliable` after the side for an unreliable event. May have no fields. |
+| `function` | `function Name from Client { ... } -> { ... }` | Arguments, then results. Either may be empty. Always reliable. |
+
+A struct or union can't hold itself, through any path of fields, lists, maps or optionals.
+
+## Types
+
+| Type | Luau type | Bits | Notes |
+| --- | --- | --- | --- |
+| `bool` | `boolean` | 1 | |
+| `uN`, `N` 1 to 32 | `number` | N | 0 to 2^N - 1. Wraps. |
+| `iN`, `N` 1 to 32 | `number` | N | -2^(N-1) to 2^(N-1) - 1. Wraps. |
+| `int(Min..Max)` | `number` | Enough for the range | Whole numbers. Clamps. |
+| `float(Min..Max, Step)` | `number` | Enough for the steps | Rounds to the step, then clamps. |
+| `f32` | `number` | 32 | Refuses NaN and infinity. |
+| `f64` | `number` | 64 | Refuses NaN and infinity. |
+| `vector` | `Vector3` | 96 | Three `f32`s. |
+| `vector(Min..Max, Step)` | `Vector3` | 3 times the axis | Each axis quantized. |
+| `rotation(Degrees)` | `CFrame` | 14 to 50 | The rotation only, off by at most `Degrees`, 0.001 to 45. |
+| `cframe(Min..Max, Step, Degrees)` | `CFrame` | A position and a rotation | |
+| `string`, `string(Bounds)` | `string` | A length, then the bytes | Cut to its largest length. |
+| `buffer`, `buffer(Bounds)` | `buffer` | A length, then the bytes | Cut to its largest length. |
+| `Instance`, `Instance(Class)` | The class, `?` when received | 0 | Roblox sends it separately. |
+| `Handle` | `InstanceHandle` | 0 | Roblox sends it separately. |
+| An enum | Its values as string literals | Enough for its values | |
+| A struct | A table of its fields | Its fields | |
+| A union | A table with `Kind` naming the variant | Its index, then the variant | |
+| `Type?` | `Type?` | 0 or 1, then the value | Not inside lists or maps. |
+| `Type[Bounds]` | `{ Type }` | A count, then the items | Cut to its largest count. |
+| `map(Key, Value)`, `map(Key, Value, Bounds)` | `{ [Key]: Value }` | A count, then each entry | Key: `bool`, a number type, an enum or a string. Value not optional. |
+
+## Bounds
+
+Bounds say how long a string, buffer, list or map can be:
+
+| Bounds | Means |
+| --- | --- |
+| `8` | Exactly 8. |
+| `..32` | 0 to 32. |
+| `2..10` | 2 to 10. |
+| Left out, or `[]` | Any length. |
+
+Bounds are whole numbers up to 16,777,215. Below its smallest length, a value makes `Fire` error.
+
+## Names
+
+Names are letters, digits and `_`, not starting with a digit. They become Luau names, so some are taken:
+
+- No name can be a Luau keyword, such as `end` or `function`.
+- No type can take a name the generated code uses, such as `Player`, `Future` or `Call`.
+- Fields become parameters of generated functions, so a field can't be a name the generated code uses inside them, such as `Stream` or `Cursor`, or look like one: a capital letter then digits, like `V1`, or all capitals with an underscore or three letters or more, like `MAX_HP` or `HUD`.
+- A union variant can't have a field called `Kind`, which names the variant.
+- A function's argument can't be called `CallId`.
+
+The compiler and the editor say which name is taken, and why.
