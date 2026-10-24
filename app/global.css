@@ -10,3 +10,19 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+.viz {
+  --viz-accent: #eb6834;
+  --viz-rest: #898781;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-hover: rgba(11, 11, 11, 0.05);
+}
+
+.dark .viz {
+  --viz-accent: #d95926;
+  --viz-rest: #898781;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-hover: rgba(255, 255, 255, 0.06);
+}

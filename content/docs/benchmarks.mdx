@@ -1,0 +1,87 @@
+---
+title: Benchmarks
+description: How Courier compares with other Roblox networking libraries, and how to run the comparison yourself.
+---
+
+These numbers come from the bench in the [Courier repository](https://github.com/XoifaiI/Courier/tree/main/bench).
+
+## Results
+
+<Benchmarks />
+
+## Memory held after the run
+
+What each library kept on the heap once the bench finished, in KB.
+
+| Library | Server | Client |
+| --- | ---: | ---: |
+| Roblox remotes | 8 | 8 |
+| Zap | 611 | 97 |
+| Blink | 589 | 156 |
+| ByteNet | 230 | 736 |
+| PakNet | 492 | 484 |
+| BlinkBlox | 1,476 | 180 |
+| NetRayCompile | 400 | 1,326 |
+| Squash | 871 | 869 |
+| Lync | 2,231 | 1,826 |
+| Courier | 2,538 | 1,582 |
+| BitNet | 1,566 | 3,095 |
+| Packet | 2,678 | 2,288 |
+| Satset | 2,603 | 7,657 |
+| QuickNet | 2,695 | 9,337 |
+
+## The libraries
+
+| Library | Version |
+| --- | --- |
+| Blink | v0.18.9 |
+| BlinkBlox | v1.3.1 |
+| Zap | v0.6.29 |
+| NetRayCompile | v0.1.1-cli.1 |
+| Lync | commit 3dbcbd3 |
+| QuickNet | commit edba9a2 |
+| Squash | v5.0.0 |
+| Satset | v0.5.0 |
+| ByteNet | commit 92addc1 |
+| BitNet | commit f16394b |
+| PakNet | v0.9.0 |
+| Packet | a copy added by hand, not pinned |
+
+The bench raises QuickNet's `MaxPacketSize` and Packet's 8,000 byte limit.
+
+## Running it yourself
+
+You need [Rojo](https://rojo.space), Git, the GitHub CLI and a Courier compiler built with `cargo build --release` in `compiler`.
+
+<Steps>
+<Step>
+
+### Fetch the libraries
+
+From `bench`, run `./fetch.sh`. It downloads every library at the version above into `bench/vendor` and compiles the bench schemas for the libraries that need a compiler.
+
+</Step>
+<Step>
+
+### Serve the bench
+
+Run `rojo serve bench/bench.project.json`, open an empty place in Studio, and connect.
+
+</Step>
+<Step>
+
+### Pick a run
+
+In `bench/Config.luau`, set `Run` to `"Throughput"` for these results. `Libraries` and `Tests` take lists of names if you only want some of them.
+
+</Step>
+<Step>
+
+### Press Play
+
+The results print to the output as tables when the run finishes.
+
+</Step>
+</Steps>
+
+`Run = "Attack"` runs the other half of the bench.
